@@ -94,6 +94,17 @@ class BaseService[ModelType]:
 
         ...
 
+    def _get_opensearch_index(self):
+        """Map model table names to OpenSearch indices"""
+        table_to_index = {
+            'tickets': 'tickets',
+            'bp': 'bp', 
+            'flow': 'flow',
+            'timesheet': 'timesheet',
+            'tenants_users': 'tenants_users'
+        }
+        return table_to_index.get(self.base_table_name)
+
     ...
 
     async def get_all(
@@ -508,6 +519,18 @@ class BaseService[ModelType]:
 
         await self.create_activity_log(item=item, handler=request)
 
+        # OpenSearch synchronization
+        try:
+            index = self._get_opensearch_index()
+            if index:
+                from shared.opensearch.populate_opensearch import create_opensearch_model, update_opensearch_instance
+                opensearch_data = await create_opensearch_model(item)
+                await update_opensearch_instance(index, opensearch_data, str(item.id))
+        except Exception as e:
+            from base4.utilities.logging.setup import get_logger
+            logger = get_logger()
+            logger.warning(f"OpenSearch CREATE sync failed for {self.base_table_name}/{item.id}: {str(e)}")
+
         if return_db_object:
             return item
         try:
@@ -626,6 +649,20 @@ class BaseService[ModelType]:
             item=model_item,
             updated=updated,
         )
+
+        # OpenSearch synchronization
+        if updated:  # Only sync if there were actual changes
+            try:
+                index = self._get_opensearch_index()
+                if index:
+                    from shared.opensearch.populate_opensearch import create_opensearch_model, update_opensearch_instance
+                    opensearch_data = await create_opensearch_model(model_item)
+                    await update_opensearch_instance(index, opensearch_data, str(item_id))
+            except Exception as e:
+                from base4.utilities.logging.setup import get_logger
+                logger = get_logger()
+                logger.warning(f"OpenSearch UPDATE sync failed for {self.base_table_name}/{item_id}: {str(e)}")
+
         if isinstance(post_commit_update_result_wrapped, tuple) and len(post_commit_update_result_wrapped) == 2:
             wrap = post_commit_update_result_wrapped[1]
             post_commit_update_result = post_commit_update_result_wrapped[0]
@@ -650,6 +687,17 @@ class BaseService[ModelType]:
         model_item.deleted = datetime.datetime.now()
 
         await model_item.save()
+
+        # OpenSearch synchronization
+        try:
+            index = self._get_opensearch_index()
+            if index:
+                from shared.opensearch.populate_opensearch import delete_opensearch_instance
+                await delete_opensearch_instance(index, str(item_id))
+        except Exception as e:
+            from base4.utilities.logging.setup import get_logger
+            logger = get_logger()
+            logger.warning(f"OpenSearch DELETE sync failed for {self.base_table_name}/{item_id}: {str(e)}")
 
         return
 
