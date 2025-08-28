@@ -185,11 +185,6 @@ class BaseService[ModelType]:
 
             filters &= spec_q
 
-        #
-
-        filters &= Q(is_valid=True)
-
-        #
 
         if request.search:
 
