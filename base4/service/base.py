@@ -341,7 +341,7 @@ class BaseService[ModelType]:
                             pl = await BaseService._build(cls, item)
                         except Exception as e:
                             raise e
-                        if set(pl.values()) == {None}:  # ako su svi None, preskoci
+                        if all(v is None for v in pl.values()):  # ako su svi None, preskoci
                             continue
 
                         res[field] = cls(**pl)
