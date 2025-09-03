@@ -513,19 +513,6 @@ class BaseService[ModelType]:
         await self.validate(logged_user_id, item.id, request, quiet=True)
 
         await self.create_activity_log(item=item, handler=request)
-
-        # OpenSearch synchronization
-        try:
-            index = self._get_opensearch_index()
-            if index:
-                from shared.opensearch.populate_opensearch import create_opensearch_model, update_opensearch_instance
-                opensearch_data = await create_opensearch_model(item)
-                await update_opensearch_instance(index, opensearch_data, str(item.id))
-        except Exception as e:
-            from base4.utilities.logging.setup import get_logger
-            logger = get_logger()
-            logger.warning(f"OpenSearch CREATE sync failed for {self.base_table_name}/{item.id}: {str(e)}")
-
         if return_db_object:
             return item
         try:
