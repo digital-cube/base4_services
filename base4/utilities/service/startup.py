@@ -3,6 +3,7 @@ import importlib
 import os
 import signal
 import sys
+import traceback
 from contextlib import asynccontextmanager
 from typing import AnyStr, Dict, List, Optional
 
@@ -13,7 +14,9 @@ import yaml
 from base4.schemas import DatabaseConfig
 from base4.utilities.db.base import TORTOISE_ORM
 from base4.utilities.files import get_project_config_folder
-from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
+from base4.utilities.logging.setup import get_logger
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
+from fastapi.responses import JSONResponse
 from tortoise import Tortoise
 from tortoise.contrib.fastapi import register_tortoise
 
@@ -32,6 +35,24 @@ async def lifespan(service: FastAPI) -> None:
     await startup_event()
     yield
     await shutdown_event()
+
+
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler that logs full traceback for 500 errors"""
+    logger = get_logger()
+    
+    # Get the full traceback
+    tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
+    tb_str = ''.join(tb)
+    
+    # Log the full error with traceback
+    logger.error(f"Unhandled exception in {request.method} {request.url}: {str(exc)}\nTraceback:\n{tb_str}")
+    
+    # Return proper HTTP 500 response
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"}
+    )
 
 
 def get_service() -> FastAPI:
@@ -54,6 +75,10 @@ def get_service() -> FastAPI:
     openapi_path = pydash.get(cfg, 'general.docs.openapi_path', f'{api_prefix}{_openapi}')
     redoc_path = pydash.get(cfg, 'general.docs.redoc_path', f'{api_prefix}{_redoc}')
     service: FastAPI = FastAPI(lifespan=lifespan, openapi_url=openapi_path, docs_url=docs_path, redoc_url=redoc_path)
+    
+    # Add global exception handler
+    service.add_exception_handler(Exception, global_exception_handler)
+    
     get_service.service: FastAPI = service
     return service
 
