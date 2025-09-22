@@ -92,6 +92,10 @@ class UniversalTableResponseBaseSchema(pydantic.BaseModel):
             for field in cls.order():
                 try:
                     res[field] = eval(f'model_item.{model_loc[field]}')
+                except KeyError as k_exc:
+                    if 'actions' in str(k_exc):
+                        continue
+                    raise k_exc
                 except Exception as e:
                     raise
         elif request.response_format == 'key-value':
