@@ -27,7 +27,7 @@ class BaseNoTenant:
     created_by = fields.UUIDField(null=True)
     last_updated = fields.DatetimeField(
         null=True,
-        auto_now=True
+       # auto_now=True
     )  # auto_now=True)
     last_updated_by = fields.UUIDField(null=True)
     validated = fields.DatetimeField(null=True)

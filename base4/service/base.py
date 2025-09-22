@@ -673,6 +673,14 @@ class BaseService[ModelType]:
                 res['item'] = post_commit_update_result
             else:
                 return post_commit_update_result
+        try:
+            from tortoise import timezone
+        
+            model_item.last_updated = timezone.now()
+            await model_item.save()
+        except Exception as exc:
+            pass
+        
         return res
 
     async def delete(self, logged_user_id: uuid.UUID, item_id: uuid.UUID, request: Request):
